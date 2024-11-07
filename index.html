@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Discussion Portal</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #F8F9FA;
+        }
+        /* ... rest of your CSS ... */
+        .header {
+            background-color: #007b7b;
+            color: white;
+            padding: 12px 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .left-pane {
+            border-right: 1px solid #BCCBDB;
+            padding: 20px;
+            background-color: #f2f2f2;
+        }
+
+        .new-question-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            width: 100%;
+            border: none;
+            text-align: left;
+            font-weight: 500;
+        }
+
+        .new-question-btn:hover {
+            background-color: #0056b3;
+        }
+
+        .search-box {
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #BCCBDB;
+            border-radius: 5px;
+            width: 100%;
+            font-size: 1rem;
+        }
+
+        .left-pane ul {
+            padding-left: 0;
+        }
+
+        .question-item {
+            padding: 15px;
+            background-color: white;
+            border: 1px solid #BCCBDB;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            cursor: pointer;
+        }
+
+        .question-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .vote-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .vote-count {
+            margin: 0 10px;
+        }
+
+        .right-pane {
+            padding: 20px;
+        }
+
+        .question-box, .response-box {
+            background-color: white;
+            padding: 15px;
+            border: 1px solid #BCCBDB;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        form input, form textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 12px;
+            border: 1px solid #BCCBDB;
+            border-radius: 5px;
+        }
+
+        .vote-btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .vote-btn.up {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .vote-btn.down {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        #no-results {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Discussion Portal</h1>
+    </div>
+
+    <div class="container-fluid mt-3">
+        <div class="row">
+            <!-- Left Pane -->
+            <div class="col-lg-4 col-md-5 col-sm-12 mb-3 left-pane">
+                <button class="new-question-btn">New Question</button>
+                <input type="text" class="search-box" placeholder="Search questions...">
+                <ul class="list-unstyled" id="question-list"></ul>
+                <div id="no-results">No matching questions found</div>
+            </div>
+
+            <!-- Right Pane -->
+            <div class="col-lg-8 col-md-7 col-sm-12 right-pane">
+                <div id="question-form-container">
+                    <h3>Ask a Question</h3>
+                    <form id="question-form">
+                        <input type="text" placeholder="Question Title" required>
+                        <textarea placeholder="Question Details" rows="3" required></textarea>
+                        <button type="submit" class="btn btn-primary">Submit Question</button>
+                    </form>
+                </div>
+
+                <div id="question-detail-container" style="display: none;">
+                    <h3>Question</h3>
+                    <div class="question-box">
+                        <h4 id="question-title"></h4>
+                        <p id="question-text"></p>
+                        <div class="vote-buttons">
+                            <button class="vote-btn up">↑</button>
+                            <span class="vote-count">0</span>
+                            <button class="vote-btn down">↓</button>
+                        </div>
+                    </div>
+
+                    <button id="resolve-button" class="btn btn-success mb-4">Resolve</button>
+
+                    <h3>Responses</h3>
+                    <div id="responses-container"></div>
+
+                    <h3>Add Response</h3>
+                    <form id="response-form">
+                        <input type="text" placeholder="Enter Name" required>
+                        <textarea placeholder="Enter Comment" rows="3" required></textarea>
+                        <button type="submit" class="btn btn-primary">Submit Response</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let questions = JSON.parse(localStorage.getItem('questions')) || [];
+            const questionList = document.getElementById('question-list');
+            const questionForm = document.getElementById('question-form');
+            const responseForm = document.getElementById('response-form');
+            const searchBox = document.querySelector('.search-box');
+            const noResults = document.getElementById('no-results');
+
+            showQuestionForm();
+
+            function displayQuestions(questionsToShow = questions) {
+                questionList.innerHTML = '';
+                questionsToShow
+                    .sort((a, b) => (b.votes || 0) - (a.votes || 0))
+                    .forEach(question => {
+                        const li = document.createElement('li');
+                        li.className = 'question-item';
+                        li.innerHTML = `
+                            <h3 class="h5">${question.title}</h3>
+                            <p>${question.question}</p>
+                            <div class="vote-buttons">
+                                <button class="vote-btn up">↑</button>
+                                <span class="vote-count">${question.votes || 0}</span>
+                                <button class="vote-btn down">↓</button>
+                            </div>
+                        `;
+
+                        const upBtn = li.querySelector('.vote-btn.up');
+                        const downBtn = li.querySelector('.vote-btn.down');
+                        const voteCount = li.querySelector('.vote-count');
+
+                        upBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            question.votes = (question.votes || 0) + 1;
+                            voteCount.textContent = question.votes;
+                            saveAndRefresh();
+                        };
+
+                        downBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            question.votes = (question.votes || 0) - 1;
+                            voteCount.textContent = question.votes;
+                            saveAndRefresh();
+                        };
+
+                        li.onclick = () => showQuestionDetail(question);
+                        questionList.appendChild(li);
+                    });
+
+                noResults.style.display = questionsToShow.length === 0 ? 'block' : 'none';
+            }
+
+            searchBox.addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase();
+                if (!searchTerm) {
+                    displayQuestions();
+                    return;
+                }
+
+                const filteredQuestions = questions.filter(q => 
+                    q.title.toLowerCase().includes(searchTerm) || 
+                    q.question.toLowerCase().includes(searchTerm)
+                );
+                displayQuestions(filteredQuestions);
+            });
+
+            document.querySelector('.new-question-btn').onclick = showQuestionForm;
+
+            questionForm.onsubmit = function(e) {
+                e.preventDefault();
+                const title = this.querySelector('input').value;
+                const question = this.querySelector('textarea').value;
+
+                const newQuestion = {
+                    id: Date.now(),
+                    title,
+                    question,
+                    responses: [],
+                    votes: 0
+                };
+
+                questions.push(newQuestion);
+                saveAndRefresh();
+                this.reset();
+            };
+
+            responseForm.onsubmit = function(e) {
+                e.preventDefault();
+                const name = this.querySelector('input').value;
+                const comment = this.querySelector('textarea').value;
+                const questionId = this.dataset.questionId;
+
+                const question = questions.find(q => q.id === parseInt(questionId));
+                if (question) {
+                    const response = {
+                        name,
+                        comment,
+                        votes: 0
+                    };
+                    question.responses.push(response);
+                    saveAndRefresh();
+                    showQuestionDetail(question);
+                    this.reset();
+                }
+            };
+
+            document.getElementById('resolve-button').onclick = function() {
+                const questionId = parseInt(responseForm.dataset.questionId);
+                questions = questions.filter(q => q.id !== questionId);
+                saveAndRefresh();
+                showQuestionForm();
+            };
+
+            function showQuestionDetail(question) {
+                document.getElementById('question-form-container').style.display = 'none';
+                const detailContainer = document.getElementById('question-detail-container');
+                detailContainer.style.display = 'block';
+
+                document.getElementById('question-title').textContent = question.title;
+                document.getElementById('question-text').textContent = question.question;
+
+                responseForm.dataset.questionId = question.id;
+
+                const responsesContainer = document.getElementById('responses-container');
+                responsesContainer.innerHTML = '';
+                question.responses
+                    .sort((a, b) => (b.votes || 0) - (a.votes || 0))
+                    .forEach(response => {
+                        const responseDiv = document.createElement('div');
+                        responseDiv.className = 'response-box';
+                        responseDiv.innerHTML = `
+                            <strong>${response.name}</strong>
+                            <p>${response.comment}</p>
+                            <div class="vote-buttons">
+                                <button class="vote-btn up">↑</button>
+                                <span class="vote-count">${response.votes || 0}</span>
+                                <button class="vote-btn down">↓</button>
+                            </div>
+                        `;
+
+                        const upBtn = responseDiv.querySelector('.vote-btn.up');
+                        const downBtn = responseDiv.querySelector('.vote-btn.down');
+                        const voteCount = responseDiv.querySelector('.vote-count');
+
+                        upBtn.onclick = () => {
+                            response.votes = (response.votes || 0) + 1;
+                            voteCount.textContent = response.votes;
+                            saveAndRefresh();
+                        };
+
+                        downBtn.onclick = () => {
+                            response.votes = (response.votes || 0) - 1;
+                            voteCount.textContent = response.votes;
+                            saveAndRefresh();
+                        };
+
+                        responsesContainer.appendChild(responseDiv);
+                    });
+            }
+
+            function showQuestionForm() {
+                document.getElementById('question-detail-container').style.display = 'none';
+                document.getElementById('question-form-container').style.display = 'block';
+            }
+
+            function saveAndRefresh() {
+                localStorage.setItem('questions', JSON.stringify(questions));
+                displayQuestions();
+            }
+
+            displayQuestions();
+        });
+    </script>
+</body>
+</html>
